@@ -1,6 +1,6 @@
 # RediSolar for Java
 
-Introductionnn
+Introduction
 ---
 
 ![Screenshot](screenshot.png)
