@@ -11,7 +11,10 @@ import redis.clients.jedis.Tuple;
 import java.text.DecimalFormat;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Set;
 
 /**
  * Retain metrics using Redis sorted sets.
@@ -46,11 +49,28 @@ public class MetricDaoRedisZsetImpl implements MetricDao {
     }
 
     // Challenge #2
+    //
     private void insertMetric(Jedis jedis, long siteId, double value, MetricUnit unit,
                               ZonedDateTime dateTime) {
         // START Challenge #2
         String metricKey = RedisSchema.getDayMetricKey(siteId, unit, dateTime);
         Integer minuteOfDay = getMinuteOfDay(dateTime);
+
+        jedis.zadd(metricKey, minuteOfDay, value + ":" + minuteOfDay);
+        jedis.expire(metricKey, METRIC_EXPIRATION_SECONDS);
+        // END Challenge #2
+    }
+
+    private void insertMetricOptimised(Jedis jedis, long siteId, double value, MetricUnit unit,
+                              ZonedDateTime dateTime) {
+        // START Challenge #2
+        String metricKey = RedisSchema.getDayMetricKey(siteId, unit, dateTime);
+        Integer minuteOfDay = getMinuteOfDay(dateTime);
+
+        Pipeline p = jedis.pipelined();
+        p.zadd(metricKey, minuteOfDay, new MeasurementMinute(value, minuteOfDay).toString());
+        p.expire(metricKey, METRIC_EXPIRATION_SECONDS);
+        p.sync();
         // END Challenge #2
     }
 
@@ -124,6 +144,7 @@ public class MetricDaoRedisZsetImpl implements MetricDao {
             }
         }
 
+        // After consuming data from redis based on minutes, we sort the data based on "value"
         Collections.reverse(measurements);
         return measurements;
     }
