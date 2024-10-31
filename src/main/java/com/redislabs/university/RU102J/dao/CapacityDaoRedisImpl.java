@@ -30,15 +30,15 @@ public class CapacityDaoRedisImpl implements CapacityDao {
     }
 
     @Override
-    public CapacityReport getReport(Integer limit) {
+    public CapacityReport getReport(Integer limit) {    // Important
         CapacityReport report;
         String key = RedisSchema.getCapacityRankingKey();
 
         try (Jedis jedis = jedisPool.getResource()) {
             Pipeline p = jedis.pipelined();
-            Response<Set<Tuple>> lowCapacity = p.zrangeWithScores(key, 0, limit-1);
+            Response<Set<Tuple>> lowCapacity = p.zrangeWithScores(key, 0, limit-1); // return lowest to highest
             Response<Set<Tuple>> highCapacity = p.zrevrangeWithScores(key, 0,
-                    limit-1);
+                    limit-1);   // returns highest to lowest
             p.sync();
 
             List<SiteCapacityTuple> lowCapacityList = lowCapacity.get().stream()
@@ -54,12 +54,18 @@ public class CapacityDaoRedisImpl implements CapacityDao {
 
         return report;
     }
+    // Trimming sorted sets
+    // We can periodically trim a sorted set using ZREM family of commands, for performance
+    // eg) ZREMRANGEBYRANK
 
     // Challenge #4
     @Override
     public Long getRank(Long siteId) {
         // START Challenge #4
-        return -2L;
+        try (Jedis jedis = jedisPool.getResource()) {
+            String capacityRankingKey = RedisSchema.getCapacityRankingKey();
+            return jedis.zrevrank(capacityRankingKey, String.valueOf(siteId));
+        }
         // END Challenge #4
     }
 }
